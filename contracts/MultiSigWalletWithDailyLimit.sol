@@ -1,4 +1,5 @@
-pragma solidity ^0.4.15;
+// SPDX-License-Identifier: GPL-3.0
+pragma solidity >=0.7;
 import "./MultiSigWallet.sol";
 
 
@@ -25,8 +26,7 @@ contract MultiSigWalletWithDailyLimit is MultiSigWallet {
     /// @param _owners List of initial owners.
     /// @param _required Number of required confirmations.
     /// @param _dailyLimit Amount in wei, which can be withdrawn without confirmations on a daily basis.
-    function MultiSigWalletWithDailyLimit(address[] _owners, uint _required, uint _dailyLimit)
-        public
+    constructor(address[] memory _owners, uint _required, uint _dailyLimit)
         MultiSigWallet(_owners, _required)
     {
         dailyLimit = _dailyLimit;
@@ -45,7 +45,7 @@ contract MultiSigWalletWithDailyLimit is MultiSigWallet {
     /// @dev Allows anyone to execute a confirmed transaction or ether withdraws until daily limit is reached.
     /// @param transactionId Transaction ID.
     function executeTransaction(uint transactionId)
-        public
+        public override
         ownerExists(msg.sender)
         confirmed(transactionId, msg.sender)
         notExecuted(transactionId)
@@ -56,7 +56,7 @@ contract MultiSigWalletWithDailyLimit is MultiSigWallet {
             txn.executed = true;
             if (!_confirmed)
                 spentToday += txn.value;
-            if (external_call(txn.destination, txn.value, txn.data.length, txn.data))
+            if (external_call(txn.destination, txn.value, txn.data))
                 Execution(transactionId);
             else {
                 ExecutionFailure(transactionId);
@@ -77,8 +77,8 @@ contract MultiSigWalletWithDailyLimit is MultiSigWallet {
         internal
         returns (bool)
     {
-        if (now > lastDay + 24 hours) {
-            lastDay = now;
+        if (block.timestamp > lastDay + 24 hours) {
+            lastDay = block.timestamp;
             spentToday = 0;
         }
         if (spentToday + amount > dailyLimit || spentToday + amount < spentToday)
@@ -93,10 +93,10 @@ contract MultiSigWalletWithDailyLimit is MultiSigWallet {
     /// @return Returns amount.
     function calcMaxWithdraw()
         public
-        constant
+        view
         returns (uint)
     {
-        if (now > lastDay + 24 hours)
+        if (block.timestamp > lastDay + 24 hours)
             return dailyLimit;
         if (dailyLimit < spentToday)
             return 0;
